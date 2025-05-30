@@ -1,8 +1,11 @@
 package com.duyhung.gamecaro;
 
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.os.Bundle;
+import android.util.TypedValue;
 import android.view.ViewGroup;
+import android.view.WindowMetrics;
 import android.widget.Button;
 import android.widget.GridLayout;
 import android.widget.TextView;
@@ -56,15 +59,31 @@ public class GameActivity extends AppCompatActivity {
         gridBoard.removeAllViews();
 
         int boardSize = CaroBoard.SIZE;
-        int cellSizeDp = 48; // chinh kich thuoc o
 
-        int cellSizePx = dpToPx(cellSizeDp);
+        gridBoard.setColumnCount(boardSize);
+        gridBoard.setRowCount(boardSize);
 
-        // GridLayout  scroll
+        // Lấy kích thước màn hình
+        WindowMetrics windowMetrics = getWindowManager().getCurrentWindowMetrics();
+        Rect bounds = windowMetrics.getBounds();
+        int screenWidth = bounds.width();
+        int screenHeight = bounds.height();
+
+        // Trừ khoảng cho TextView và Button
+        int reservedHeight = dpToPx(80);
+        int availableHeight = screenHeight - reservedHeight;
+
+        // Tính kích thước ô vuông vừa hết chiều cao khả dụng
+        int cellSize = availableHeight / boardSize;
+
+        int gridWidth = cellSize * boardSize;
+        int gridHeight = cellSize * boardSize;
+
         ViewGroup.LayoutParams params = gridBoard.getLayoutParams();
-        params.width = cellSizePx * boardSize;
-        params.height = cellSizePx * boardSize;
+        params.width = gridWidth;
+        params.height = gridHeight;
         gridBoard.setLayoutParams(params);
+        gridBoard.requestLayout();
 
         for (int i = 0; i < boardSize; i++) {
             for (int j = 0; j < boardSize; j++) {
@@ -72,20 +91,21 @@ public class GameActivity extends AppCompatActivity {
                 final int col = j;
                 Button btn = new Button(this);
                 btn.setText("");
-                btn.setTextSize(18);
-                btn.setWidth(cellSizePx);
-                btn.setHeight(cellSizePx);
+                btn.setTextSize(TypedValue.COMPLEX_UNIT_PX, cellSize * 0.5f);
+
+                btn.setWidth(cellSize);
+                btn.setHeight(cellSize);
                 btn.setMinWidth(0);
                 btn.setMinHeight(0);
-                btn.setPadding(0,0,0,0);
+                btn.setPadding(0, 0, 0, 0);
                 btn.setBackgroundResource(android.R.drawable.btn_default);
 
                 GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-                lp.width = cellSizePx;
-                lp.height = cellSizePx;
+                lp.width = cellSize;
+                lp.height = cellSize;
                 lp.columnSpec = GridLayout.spec(j);
                 lp.rowSpec = GridLayout.spec(i);
-                lp.setMargins(1,1,1,1);
+                lp.setMargins(1, 1, 1, 1);
                 btn.setLayoutParams(lp);
 
                 btn.setOnClickListener(v -> onCellClicked(row, col));
@@ -110,7 +130,6 @@ public class GameActivity extends AppCompatActivity {
             return;
         }
 
-        // swap turn
         if (mode == MODE_TWO_PLAYERS) {
             currentPlayer = (currentPlayer == CaroBoard.PLAYER_X) ? CaroBoard.PLAYER_O : CaroBoard.PLAYER_X;
             tvStatus.setText("Lượt người chơi: " + playerName(currentPlayer));
