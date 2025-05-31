@@ -12,8 +12,6 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 
 public class GameActivity extends AppCompatActivity {
@@ -33,6 +31,9 @@ public class GameActivity extends AppCompatActivity {
     private boolean gameEnded = false;
     private int mode;
 
+    private int playerSymbol;
+    private int aiSymbol;
+
     private Random random = new Random();
 
     @Override
@@ -50,9 +51,78 @@ public class GameActivity extends AppCompatActivity {
         mode = getIntent().getIntExtra(EXTRA_MODE, MODE_TWO_PLAYERS);
 
         createBoardUI();
-        resetGame();
 
-        btnPlayAgain.setOnClickListener(v -> resetGame());
+        if (mode == MODE_PLAY_WITH_AI) {
+            showSymbolChoiceDialog();
+        } else {
+            playerSymbol = CaroBoard.PLAYER_X;
+            aiSymbol = -1;
+            currentPlayer = CaroBoard.PLAYER_X;
+            resetGame();
+        }
+
+        btnPlayAgain.setOnClickListener(v -> {
+            caroBoard.reset();
+            resetGame();
+            if (mode == MODE_PLAY_WITH_AI) showSymbolChoiceDialog();
+        });
+    }
+
+    // Hàm đếm số nước đã đi trên bàn
+    private int countMoves() {
+        int count = 0;
+        for (int i = 0; i < CaroBoard.SIZE; i++) {
+            for (int j = 0; j < CaroBoard.SIZE; j++) {
+                if (caroBoard.getCell(i, j) != CaroBoard.EMPTY) count++;
+            }
+        }
+        return count;
+    }
+
+    private void aiMakeMove() {
+        if (gameEnded) return;
+
+        int moveCount = countMoves();
+        int[] bestMove = CaroAI.getBestMove(caroBoard, aiSymbol, moveCount);
+
+        if (bestMove != null) {
+            caroBoard.setMove(bestMove[0], bestMove[1], aiSymbol);
+            updateButtonUI(bestMove[0], bestMove[1]);
+
+            if (caroBoard.checkWin(aiSymbol)) {
+                tvStatus.setText("Máy thắng!");
+                gameEnded = true;
+                btnPlayAgain.setEnabled(true);
+            } else {
+                currentPlayer = playerSymbol;
+                tvStatus.setText("Lượt người chơi: Bạn");
+            }
+        }
+    }
+
+    private void showSymbolChoiceDialog() {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Chọn ký hiệu của bạn")
+                .setMessage("Bạn muốn đi X hay O?")
+                .setCancelable(false)
+                .setPositiveButton("X", (dialog, which) -> {
+                    setPlayerSymbol(CaroBoard.PLAYER_X);
+                })
+                .setNegativeButton("O", (dialog, which) -> {
+                    setPlayerSymbol(CaroBoard.PLAYER_O);
+                })
+                .show();
+    }
+
+    private void setPlayerSymbol(int symbol) {
+        playerSymbol = symbol;
+        aiSymbol = (symbol == CaroBoard.PLAYER_X) ? CaroBoard.PLAYER_O : CaroBoard.PLAYER_X;
+        currentPlayer = CaroBoard.PLAYER_X;
+        resetGame();
+        tvStatus.setText("Lượt người chơi: " + playerName(currentPlayer));
+        if (currentPlayer == aiSymbol) {
+            aiMakeMove();
+        }
     }
 
     private void createBoardUI() {
@@ -63,17 +133,14 @@ public class GameActivity extends AppCompatActivity {
         gridBoard.setColumnCount(boardSize);
         gridBoard.setRowCount(boardSize);
 
-        // Lấy kích thước màn hình
         WindowMetrics windowMetrics = getWindowManager().getCurrentWindowMetrics();
         Rect bounds = windowMetrics.getBounds();
         int screenWidth = bounds.width();
         int screenHeight = bounds.height();
 
-        // Trừ khoảng cho TextView và Button
         int reservedHeight = dpToPx(80);
         int availableHeight = screenHeight - reservedHeight;
 
-        // Tính kích thước ô vuông vừa hết chiều cao khả dụng
         int cellSize = availableHeight / boardSize;
 
         int gridWidth = cellSize * boardSize;
@@ -92,7 +159,6 @@ public class GameActivity extends AppCompatActivity {
                 Button btn = new Button(this);
                 btn.setText("");
                 btn.setTextSize(TypedValue.COMPLEX_UNIT_PX, cellSize * 0.5f);
-
                 btn.setWidth(cellSize);
                 btn.setHeight(cellSize);
                 btn.setMinWidth(0);
@@ -120,6 +186,8 @@ public class GameActivity extends AppCompatActivity {
         if (gameEnded) return;
         if (caroBoard.getCell(row, col) != CaroBoard.EMPTY) return;
 
+        if (mode == MODE_PLAY_WITH_AI && currentPlayer != playerSymbol) return;
+
         caroBoard.setMove(row, col, currentPlayer);
         updateButtonUI(row, col);
 
@@ -134,50 +202,14 @@ public class GameActivity extends AppCompatActivity {
             currentPlayer = (currentPlayer == CaroBoard.PLAYER_X) ? CaroBoard.PLAYER_O : CaroBoard.PLAYER_X;
             tvStatus.setText("Lượt người chơi: " + playerName(currentPlayer));
         } else if (mode == MODE_PLAY_WITH_AI) {
-            if (currentPlayer == CaroBoard.PLAYER_X) {
-                currentPlayer = CaroBoard.PLAYER_O;
-                tvStatus.setText("Lượt người chơi: Máy");
-                aiMakeMove();
-            } else {
-                currentPlayer = CaroBoard.PLAYER_X;
-                tvStatus.setText("Lượt người chơi: Bạn");
-            }
-        }
-    }
-
-    private void aiMakeMove() {
-        if (gameEnded) return;
-
-        List<int[]> emptyCells = new ArrayList<>();
-        for (int i = 0; i < CaroBoard.SIZE; i++) {
-            for (int j = 0; j < CaroBoard.SIZE; j++) {
-                if (caroBoard.getCell(i, j) == CaroBoard.EMPTY) {
-                    emptyCells.add(new int[]{i, j});
-                }
-            }
-        }
-
-        if (emptyCells.isEmpty()) {
-            tvStatus.setText("Hòa rồi!");
-            gameEnded = true;
-            btnPlayAgain.setEnabled(true);
-            return;
-        }
-
-        int[] cell = emptyCells.get(random.nextInt(emptyCells.size()));
-
-        caroBoard.setMove(cell[0], cell[1], CaroBoard.PLAYER_O);
-        updateButtonUI(cell[0], cell[1]);
-
-        if (caroBoard.checkWin(CaroBoard.PLAYER_O)) {
-            tvStatus.setText("Máy thắng!");
-            gameEnded = true;
-            btnPlayAgain.setEnabled(true);
+            currentPlayer = aiSymbol;
+            tvStatus.setText("Lượt người chơi: Máy");
+            aiMakeMove();
         }
     }
 
     private String playerName(int player) {
-        if (mode == MODE_PLAY_WITH_AI && player == CaroBoard.PLAYER_O) {
+        if (mode == MODE_PLAY_WITH_AI && player == aiSymbol) {
             return "Máy";
         } else {
             return player == CaroBoard.PLAYER_X ? "X" : "O";
